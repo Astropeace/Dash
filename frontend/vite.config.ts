@@ -23,4 +23,9 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
   },
+  // Configuration for handling SPA fallback
+  preview: {
+    port: 5173,
+    host: true
+  },
 });

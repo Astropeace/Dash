@@ -1,7 +1,10 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { RootState } from './index';
 
-// Mock data for development
+// Use mock data based on environment variable
+const useMockData = true; // Always use mock data for Netlify deployment
+
+// Mock data for development or frontend-only deployment
 const mockData = {
   user: {
     id: 'mock-user-id',
@@ -344,7 +347,7 @@ const mockData = {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
+    baseUrl: import.meta.env.VITE_API_BASE_URL || '/api',
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as RootState).auth.token;
       if (token) {
@@ -398,14 +401,16 @@ export const api = createApi({
     getDashboardStats: builder.query({
       queryFn: () => {
         return { data: { status: 'success', data: mockData.dashboard.stats } };
-      }
+      },
+      providesTags: ['Dashboard']
     }),
 
     // Campaigns data
     getCampaigns: builder.query({
       queryFn: () => {
         return { data: { status: 'success', data: mockData.campaigns } };
-      }
+      },
+      providesTags: ['Campaigns']
     }),
 
     // Investors data
