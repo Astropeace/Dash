@@ -1,0 +1,263 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Multi-tenant organization model
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String?  @unique
+  tier      String   @default("basic") // basic, premium, enterprise
+  settings  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  users               User[]
+  roles               Role[]
+  dataSources         DataSource[]
+  campaigns           Campaign[]
+  investors           Investor[]
+  metrics             Metric[]
+  reports             Report[]
+  auditLogs           AuditLog[]
+
+  @@map("tenants")
+}
+
+// User authentication model
+model User {
+  id                String    @id @default(uuid())
+  email             String
+  passwordHash      String    @map("password_hash")
+  firstName         String?   @map("first_name")
+  lastName          String?   @map("last_name")
+  avatar            String?
+  isActive          Boolean   @default(true) @map("is_active")
+  lastLogin         DateTime? @map("last_login")
+  mfaEnabled        Boolean   @default(false) @map("mfa_enabled")
+  mfaSecret         String?   @map("mfa_secret")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Multi-tenant relationship
+  tenantId          String    @map("tenant_id")
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+
+  // Relationships
+  userRoles         UserRole[]
+  reports           Report[]
+  auditLogs         AuditLog[]
+  refreshTokens     RefreshToken[]
+
+  @@unique([email, tenantId])
+  @@map("users")
+}
+
+// Role and permissions model
+model Role {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  permissions Json
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Multi-tenant relationship
+  tenantId    String    @map("tenant_id")
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+
+  // Relationships
+  userRoles   UserRole[]
+
+  @@unique([name, tenantId])
+  @@map("roles")
+}
+
+// Join table for user-role relationships
+model UserRole {
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// Refresh tokens for JWT authentication
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  // Relationships
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// Data source connections (APIs, CSV, SQL, etc.)
+model DataSource {
+  id               String   @id @default(uuid())
+  name             String
+  type             String // "api", "csv", "sql"
+  connectionDetails Json     @map("connection_details")
+  credentials      Json?
+  refreshSchedule  String?  @map("refresh_schedule") // cron expression for scheduled refresh
+  lastSync         DateTime? @map("last_sync")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Multi-tenant relationship
+  tenantId          String  @map("tenant_id")
+  tenant            Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@unique([name, tenantId])
+  @@map("data_sources")
+}
+
+// Investor model
+model Investor {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  contactInfo Json?    @map("contact_info")
+  details     Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Multi-tenant relationship
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  // Relationships
+  metrics     Metric[]
+
+  @@map("investors")
+}
+
+// Advertising campaign model
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  startDate   DateTime @map("start_date")
+  endDate     DateTime? @map("end_date")
+  budget      Decimal
+  type        String // Social, Search, Display, etc.
+  channel     String? // Facebook, Google, Twitter, etc.
+  targeting   Json?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Multi-tenant relationship
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  // Relationships
+  metrics     Metric[]
+
+  @@map("campaigns")
+}
+
+// Performance metrics model
+model Metric {
+  id           String   @id @default(uuid())
+  date         DateTime
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  conversions  Int      @default(0)
+  revenue      Decimal  @default(0)
+  cost         Decimal  @default(0)
+  roi          Decimal? // Calculated field
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Multi-tenant relationship
+  tenantId     String   @map("tenant_id")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+
+  // Relationships
+  campaignId   String   @map("campaign_id")
+  campaign     Campaign @relation(fields: [campaignId], references: [id])
+  investorId   String?  @map("investor_id")
+  investor     Investor? @relation(fields: [investorId], references: [id])
+
+  @@map("metrics")
+}
+
+// Custom reports model
+model Report {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  type        String // dashboard, campaign, investor
+  schedule    String? // cron expression for scheduled reports
+  filters     Json?
+  lastRun     DateTime? @map("last_run")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Multi-tenant relationship
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  // Relationships
+  createdById String   @map("created_by_id")
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  exports     ReportExport[]
+
+  @@map("reports")
+}
+
+// Report exports model
+model ReportExport {
+  id          String   @id @default(uuid())
+  format      String // pdf, csv, excel
+  filePath    String   @map("file_path")
+  createdAt   DateTime @default(now()) @map("created_at")
+  expiresAt   DateTime? @map("expires_at")
+
+  // Relationships
+  reportId    String   @map("report_id")
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("report_exports")
+}
+
+// Security audit logging
+model AuditLog {
+  id           String   @id @default(uuid())
+  action       String
+  resourceType String?  @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  details      Json?
+  timestamp    DateTime @default(now())
+
+  // Multi-tenant relationship
+  tenantId     String   @map("tenant_id")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+
+  // Relationships
+  userId       String?  @map("user_id")
+  user         User?    @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}

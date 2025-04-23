@@ -1,0 +1,16 @@
+{
+  "name": "app2",
+  "version": "1.0.0",
+  "description": "A comprehensive dashboard for monitoring and analyzing financial marketing campaigns, investments, and performance metrics.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@sentry/cli": "^2.43.0",
+    "recharts": "^2.15.3"
+  }
+}
