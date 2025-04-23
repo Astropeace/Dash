@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../../store';
+import { useSelector } from 'react-redux';
+import { RootState, useAppDispatch } from '../../store';
 import {
   fetchMetrics,
   applyMetricsFilters,
@@ -355,7 +355,7 @@ const TabPanel = (props: TabPanelProps) => {
 
 const MetricsPage: React.FC = () => {
   const theme = useTheme();
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const { 
     filteredData, 
     filters, 
@@ -374,12 +374,12 @@ const MetricsPage: React.FC = () => {
   
   // Fetch metrics data on component mount
   useEffect(() => {
-    dispatch(fetchMetrics());
+    void dispatch(fetchMetrics());
   }, [dispatch]);
   
   // Handle refresh
   const handleRefresh = () => {
-    dispatch(fetchMetrics());
+    void dispatch(fetchMetrics());
   };
 
   // Format currency
@@ -412,7 +412,7 @@ const MetricsPage: React.FC = () => {
       timeRange: newTimeRange
     };
     
-    dispatch(applyMetricsFilters(updatedFilters));
+    void dispatch(applyMetricsFilters(updatedFilters));
   };
 
   // Handle campaign filter change
@@ -426,7 +426,7 @@ const MetricsPage: React.FC = () => {
       campaign: newCampaign
     };
     
-    dispatch(applyMetricsFilters(updatedFilters));
+    void dispatch(applyMetricsFilters(updatedFilters));
   };
 
   // Handle channel filter change
@@ -440,7 +440,7 @@ const MetricsPage: React.FC = () => {
       channel: newChannel
     };
     
-    dispatch(applyMetricsFilters(updatedFilters));
+    void dispatch(applyMetricsFilters(updatedFilters));
   };
   
   // Handle date filter changes
@@ -453,13 +453,13 @@ const MetricsPage: React.FC = () => {
         endDate
       };
       
-      dispatch(applyMetricsFilters(updatedFilters));
+      void dispatch(applyMetricsFilters(updatedFilters));
     }
   };
   
   // Handle export
   const handleExport = () => {
-    dispatch(exportMetricsReport('pdf'));
+    void dispatch(exportMetricsReport('pdf'));
   };
 
   // Metric card component
