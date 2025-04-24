@@ -22,8 +22,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          mui: ['@mui/material', '@mui/icons-material'],
+          charts: ['recharts', 'd3']
+        }
+      }
+    }
   },
-  // Configuration for handling SPA fallback
   preview: {
     port: 5173,
     host: true
