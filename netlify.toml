@@ -1,13 +1,17 @@
 [build]
-  base = "frontend/"
-  publish = "frontend/dist/"
-  command = "cd frontend && npm install && npm run build"
+  base = "frontend"
+  publish = "dist"
+  command = "npm install && npm run build"
 
 [build.environment]
   NODE_VERSION = "18.16.0"
-  GO_VERSION = "1.19"
+  
+  # Add required environment variables for production
+  VITE_API_ENDPOINT = "/.netlify/functions/api"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Remove functions section if not using Netlify Functions
