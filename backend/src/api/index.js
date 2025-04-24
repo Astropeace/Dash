@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const datasourceRoutes = require('./routes/datasource.routes'); // Added datasource routes
 
 /**
  * API Routes
@@ -20,7 +21,12 @@ function routes() {
 
   // Mount API routes
   router.use('/auth', authRoutes);
-  router.use('/users', userRoutes);
+  // Note: User routes might also need to be tenant-aware depending on requirements
+  router.use('/users', userRoutes); 
+  
+  // Mount tenant-specific routes
+  router.use('/tenants/:tenantId/datasources', datasourceRoutes);
+  // TODO: Add other tenant-specific routes here (campaigns, investors, metrics, etc.)
 
   return router;
 }
