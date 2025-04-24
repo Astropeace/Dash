@@ -21,6 +21,9 @@ const config = {
     accessExpiration: process.env.JWT_ACCESS_EXPIRATION || '15m',
     refreshExpiration: process.env.JWT_REFRESH_EXPIRATION || '7d',
   },
+
+  // Session configuration
+  sessionSecret: process.env.SESSION_SECRET || 'default_dev_session_secret', // Default for dev, ensure it's set in prod
   
   // Redis configuration
   redis: {
@@ -55,6 +58,11 @@ const config = {
     },
     facebookAds: {
       apiKey: process.env.FACEBOOK_ADS_API_KEY,
+    },
+    // Google OAuth configuration
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     },
   },
   

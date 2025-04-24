@@ -371,4 +371,228 @@ router.post('/change-password', passport.authenticate('jwt', { session: false })
   }
 });
 
+
+// --- Google OAuth ---
+
+/**
+ * @route   GET /api/auth/google
+ * @desc    Initiate Google OAuth flow
+ * @access  Public
+ */
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false })); // Use session: false initially, rely on our session logic later
+
+/**
+ * @route   GET /api/auth/google/callback
+ * @desc    Google OAuth callback
+ * @access  Public
+ */
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { failureRedirect: `${config.frontendUrl}/login?error=google_failed`, session: false }), // Authenticate, get partialUser on req.user
+  (req, res) => {
+    // Authentication successful, req.user contains the partialUser from GoogleStrategy
+    const partialUser = req.user;
+
+    if (!partialUser || !partialUser.id) {
+      logger.error('Google OAuth callback missing user data after authentication.');
+      return res.redirect(`${config.frontendUrl}/login?error=internal_error`);
+    }
+
+    // Store partial user data in session to await tenant selection/creation
+    req.session.pendingUser = partialUser;
+    logger.info(`Stored pending user in session: ${partialUser.email}`);
+
+    // Redirect user to the frontend page for tenant selection
+    res.redirect(`${config.frontendUrl}/select-tenant`);
+  }
+);
+
+// --- Tenant Association (Session Based) ---
+
+/**
+ * @route   GET /api/auth/pending-state
+ * @desc    Get pending user state from session (after Google OAuth)
+ * @access  Private (Session required)
+ */
+router.get('/pending-state', (req, res) => {
+  if (req.session.pendingUser) {
+    // TODO: Fetch invitations for req.session.pendingUser.email
+    logger.info(`Returning pending user state for: ${req.session.pendingUser.email}`);
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: req.session.pendingUser,
+        invitations: [], // Placeholder for tenant invitations
+      },
+    });
+  } else {
+    logger.warn('Access to /pending-state without pending user session.');
+    res.status(401).json({ status: 'error', message: 'No pending authentication state found.' });
+  }
+});
+
+/**
+ * @route   POST /api/auth/associate-tenant
+ * @desc    Associate pending user with an existing tenant
+ * @access  Private (Session required)
+ */
+router.post('/associate-tenant', async (req, res, next) => {
+  if (!req.session.pendingUser) {
+    return res.status(401).json({ status: 'error', message: 'No pending authentication state found.' });
+  }
+
+  const { tenantId } = req.body;
+  const partialUser = req.session.pendingUser;
+
+  if (!tenantId) {
+    return res.status(400).json({ status: 'error', message: 'Tenant ID is required.' });
+  }
+
+  try {
+    // TODO: Verify user is allowed to join this tenant (check invitations)
+    logger.info(`Attempting to associate user ${partialUser.email} with tenant ${tenantId}`);
+
+    // Update the user record with the tenantId
+    const updatedUser = await prisma.user.update({
+      where: { id: partialUser.id },
+      data: { tenantId: tenantId },
+      // Include roles after update if needed
+      include: { userRoles: { include: { role: true } } }
+    });
+
+     // TODO: Assign default role if none exists?
+
+    // Generate JWT tokens (now with tenantId)
+    const accessToken = jwt.sign(
+      { id: updatedUser.id, email: updatedUser.email, tenantId: updatedUser.tenantId },
+      config.jwt.secret,
+      { expiresIn: config.jwt.accessExpiration }
+    );
+    // TODO: Generate and store refresh token
+    const refreshToken = 'dummy-refresh-token-google'; // Placeholder
+
+    // Clear the pending user from the session
+    delete req.session.pendingUser;
+
+    // Return tokens and user info
+    res.status(200).json({
+      status: 'success',
+      message: 'Tenant associated successfully.',
+      data: {
+        accessToken,
+        refreshToken,
+        expiresIn: config.jwt.accessExpiration,
+        user: { // Return user info consistent with local login
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          roles: updatedUser.userRoles?.map(ur => ur.role.name) || [],
+        },
+      },
+    });
+
+  } catch (error) {
+    logger.error(`Error associating tenant ${tenantId} for user ${partialUser.email}:`, error);
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/auth/create-and-associate-tenant
+ * @desc    Create a new tenant and associate the pending user
+ * @access  Private (Session required)
+ */
+router.post('/create-and-associate-tenant', async (req, res, next) => {
+   if (!req.session.pendingUser) {
+    return res.status(401).json({ status: 'error', message: 'No pending authentication state found.' });
+  }
+
+  const { tenantName } = req.body; // Add other tenant fields as needed (e.g., tier)
+  const partialUser = req.session.pendingUser;
+
+  if (!tenantName) {
+    return res.status(400).json({ status: 'error', message: 'Tenant name is required.' });
+  }
+
+  try {
+    logger.info(`Attempting to create tenant '${tenantName}' for user ${partialUser.email}`);
+
+    // Create the new tenant
+    const newTenant = await prisma.tenant.create({
+      data: {
+        name: tenantName,
+        // Add default tier, settings etc. if applicable
+      }
+    });
+
+    // TODO: Create default roles for the new tenant (e.g., 'admin', 'user')
+    const adminRole = await prisma.role.create({
+        data: {
+            name: 'admin',
+            description: 'Administrator role',
+            permissions: ["*"], // Example: grant all permissions
+            tenantId: newTenant.id,
+        }
+    });
+    // Create other default roles...
+
+    // Update the user record with the new tenantId
+    const updatedUser = await prisma.user.update({
+      where: { id: partialUser.id },
+      data: { tenantId: newTenant.id },
+    });
+
+    // Assign the user the 'admin' role for the tenant they created
+     await prisma.userRole.create({
+        data: {
+          userId: updatedUser.id,
+          roleId: adminRole.id,
+        },
+      });
+
+    // Fetch the updated user with roles
+     const finalUser = await prisma.user.findUnique({
+         where: { id: updatedUser.id },
+         include: { userRoles: { include: { role: true } } }
+     });
+
+
+    // Generate JWT tokens
+    const accessToken = jwt.sign(
+      { id: finalUser.id, email: finalUser.email, tenantId: finalUser.tenantId },
+      config.jwt.secret,
+      { expiresIn: config.jwt.accessExpiration }
+    );
+    // TODO: Generate and store refresh token
+    const refreshToken = 'dummy-refresh-token-google-new'; // Placeholder
+
+    // Clear the pending user from the session
+    delete req.session.pendingUser;
+
+    // Return tokens and user info
+    res.status(201).json({ // 201 Created for new tenant
+      status: 'success',
+      message: 'Tenant created and associated successfully.',
+      data: {
+        accessToken,
+        refreshToken,
+        expiresIn: config.jwt.accessExpiration,
+        user: {
+          id: finalUser.id,
+          email: finalUser.email,
+          firstName: finalUser.firstName,
+          lastName: finalUser.lastName,
+          roles: finalUser.userRoles?.map(ur => ur.role.name) || [],
+        },
+      },
+    });
+
+  } catch (error) {
+     logger.error(`Error creating tenant '${tenantName}' for user ${partialUser.email}:`, error);
+    next(error);
+  }
+});
+
+
 module.exports = router;

@@ -5,6 +5,9 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const path = require('path');
+const session = require('express-session');
+const RedisStore = require('connect-redis').default; // Use .default for ES6 compatibility
+const redisLoader = require('./redis'); // Import the loader to get the client
 const config = require('../config');
 const logger = require('../utils/logger');
 const routes = require('../api');
@@ -39,6 +42,38 @@ async function expressLoader({ app }) {
   // Request body parsers
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+
+  // Session middleware (needs to come before routes that use sessions)
+  const redisClient = redisLoader.getClient(); // Get the initialized Redis client
+  if (redisClient) { // Only configure session if Redis is available
+    const redisStore = new RedisStore({
+      client: redisClient,
+      prefix: 'sess:', // Optional prefix for session keys in Redis
+      // ttl: 86400 // Optional: Session TTL in seconds (e.g., 1 day)
+    });
+
+    app.use(
+      session({
+        store: redisStore,
+        secret: config.sessionSecret, // Use the secret from config
+        resave: false, // Don't save session if unmodified
+        saveUninitialized: false, // Don't create session until something stored
+        cookie: {
+          secure: config.nodeEnv === 'production', // Use secure cookies in production
+          httpOnly: true, // Prevent client-side JS from accessing the cookie
+          maxAge: 1000 * 60 * 60 * 24 * 7, // Optional: Cookie expiry (e.g., 7 days)
+          sameSite: 'lax', // Adjust as needed ('strict', 'lax', 'none')
+        },
+      })
+    );
+    logger.info('Session middleware configured with Redis store.');
+  } else {
+    logger.warn('Redis client not available. Session middleware skipped. Google OAuth flow requiring sessions will not work.');
+    // Optionally, configure a memory store for development if Redis isn't running,
+    // but be aware it's not suitable for production and won't persist across restarts.
+    // app.use(session({ secret: config.sessionSecret, resave: false, saveUninitialized: false }));
+  }
+
 
   // Request logging
   app.use(morgan('combined', { stream: logger.stream }));
