@@ -66,14 +66,12 @@ export const authSlice = createSlice({
     
     // Logout action
     logout: (state) => {
-      // For MVP, don't actually log out
-      console.log('Logout pressed - in a real app this would log you out');
-      
-      // Keep the demo user logged in for MVP
-      state.isAuthenticated = true;
-      state.user = demoUser;
-      state.token = 'demo-token';
-      state.refreshToken = 'demo-refresh-token';
+      state.isAuthenticated = false;
+      state.user = null;
+      state.token = null;
+      state.refreshToken = null;
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
     },
     
     // Update user profile

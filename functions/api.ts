@@ -1,29 +1,33 @@
-import express from 'express';
-import http from 'http';
-import config from './config';
-import loaders from './loaders';
-import logger from './utils/logger';
-import { Handler, Context } from '@netlify/functions';
+import { Handler } from '@netlify/functions';
+import { router } from '../../backend/src/api/routes';
+import logger from '../../backend/src/utils/logger';
 
-export const handler: Handler = async (event: any, context: Context) => {
+export const handler: Handler = async (event, context) => {
   try {
-    const app = express();
-    const server = http.createServer(app);
+    const path = event.path.replace(/\.netlify\/functions\/api/, '');
+    const method = event.httpMethod;
+    
+    // Find matching route
+    const route = router.find(method, path);
+    
+    if (!route) {
+      return { statusCode: 404, body: JSON.stringify({ error: 'Not found' }) };
+    }
 
-    // Initialize application loaders
-    await loaders({ app });
+    // Execute route handler
+    const result = await route.handler({
+      query: event.queryStringParameters,
+      body: event.body ? JSON.parse(event.body) : {},
+      headers: event.headers,
+      pathParams: route.params
+    });
 
-    // Netlify functions don't need to listen
-    // server.listen(config.port, () => {
-    //   logger.info(`🚀 Server running at http://localhost:${config.port}`);
-    //   logger.info(`📚 API Documentation available at http://localhost:${config.port}/api-docs`);
-    //   logger.info(`🔧 Environment: ${config.nodeEnv}`);
-    // });
-
-    // Return a success response
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: 'Server started successfully' }),
+      body: JSON.stringify(result),
+      headers: {
+        'Content-Type': 'application/json'
+      }
     };
   } catch (error: any) {
     logger.error('Failed to start server:', error);
@@ -45,4 +49,4 @@ process.on('uncaughtException', (err: any) => {
   logger.error('Uncaught Exception:', err);
   // For uncaught exceptions, it's safer to crash and restart
   process.exit(1);
-};
+});

@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { RootState } from './index';
 
 // Use mock data based on environment variable
-const useMockData = true; // Always use mock data for Netlify deployment
+const useMockData = import.meta.env.VITE_USE_MOCK_DATA !== 'false';
 
 // Mock data for development or frontend-only deployment
 const mockData = {

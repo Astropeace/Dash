@@ -14,4 +14,9 @@
   to = "/index.html"
   status = 200
 
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+
 # Remove functions section if not using Netlify Functions

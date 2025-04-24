@@ -4,9 +4,9 @@ import {
   Container, Typography, Button, Box, Stack, CircularProgress,
   List, ListItem, ListItemText, Divider, TextField, Alert
 } from '@mui/material';
-// import { useAppDispatch } from '../../hooks/reduxHooks'; // Assuming Redux hooks setup
-// import { setCredentials } from '../../store/slices/authSlice'; // Assuming auth slice action
-// import apiClient from '../../services/apiClient'; // Assuming an API client setup
+import { useAppDispatch } from '../../src/hooks/reduxHooks'; // Assuming Redux hooks setup
+import { setCredentials } from '../../src/store/slices/authSlice'; // Assuming auth slice action
+import apiClient from '../../src/services/apiClient'; // Assuming an API client setup
 
 // Placeholder types - replace with actual types from backend/shared types
 interface PendingUser {
@@ -24,7 +24,7 @@ interface TenantInvitation {
 
 const SelectTenantPage: React.FC = () => {
   const navigate = useNavigate();
-  // const dispatch = useAppDispatch(); // For Redux
+  const dispatch = useAppDispatch(); // For Redux
   const [pendingUser, setPendingUser] = useState<PendingUser | null>(null);
   const [invitations, setInvitations] = useState<TenantInvitation[]>([]);
   const [newTenantName, setNewTenantName] = useState('');
@@ -38,23 +38,23 @@ const SelectTenantPage: React.FC = () => {
       setError(null);
       try {
         // TODO: Replace with actual API call using apiClient
-        // const response = await apiClient.get('/auth/pending-state');
+        const response = await apiClient.get('/auth/pending-state');
         // Mock response for now:
-        const mockResponse = {
-          status: 'success',
-          data: {
-            user: { id: 'temp-user-id', email: 'user@example.com', firstName: 'Google', lastName: 'User' },
-            invitations: [
-              { tenantId: 'tenant-1', tenantName: 'Existing Tenant A' },
-              { tenantId: 'tenant-2', tenantName: 'Another Company' },
-            ]
-          }
-        };
+        // const mockResponse = {
+        //   status: 'success',
+        //   data: {
+        //     user: { id: 'temp-user-id', email: 'user@example.com', firstName: 'Google', lastName: 'User' },
+        //     invitations: [
+        //       { tenantId: 'tenant-1', tenantName: 'Existing Tenant A' },
+        //       { tenantId: 'tenant-2', tenantName: 'Another Company' },
+        //     ]
+        //   }
+        // };
         // --- End Mock ---
 
-        if (mockResponse.status === 'success' && mockResponse.data?.user) {
-          setPendingUser(mockResponse.data.user);
-          setInvitations(mockResponse.data.invitations || []);
+        if (response.status === 'success' && response.data?.user) {
+          setPendingUser(response.data.user);
+          setInvitations(response.data.invitations || []);
         } else {
           // No pending state, redirect to login
           navigate('/login');
@@ -77,22 +77,22 @@ const SelectTenantPage: React.FC = () => {
     setError(null);
     try {
       // TODO: Replace with actual API call
-      // const response = await apiClient.post('/auth/associate-tenant', { tenantId });
+      const response = await apiClient.post('/auth/associate-tenant', { tenantId });
       // Mock response:
-      const mockResponse = {
-        status: 'success',
-        data: {
-          accessToken: 'dummy-jwt-access-token',
-          refreshToken: 'dummy-jwt-refresh-token',
-          user: { ...pendingUser, roles: ['user'] } // Add roles from response
-        }
-      };
+      // const mockResponse = {
+      //   status: 'success',
+      //   data: {
+      //     accessToken: 'dummy-jwt-access-token',
+      //     refreshToken: 'dummy-jwt-refresh-token',
+      //     user: { ...pendingUser, roles: ['user'] } // Add roles from response
+      //   }
+      // };
       // --- End Mock ---
 
-      if (mockResponse.status === 'success' && mockResponse.data?.accessToken) {
+      if (response.status === 'success' && response.data?.accessToken) {
         // TODO: Store tokens and user data (e.g., using Redux dispatch)
-        // dispatch(setCredentials({ token: mockResponse.data.accessToken, user: mockResponse.data.user }));
-        console.log('TODO: Store credentials', mockResponse.data);
+        dispatch(setCredentials({ token: response.data.accessToken, user: response.data.user }));
+        console.log('TODO: Store credentials', response.data);
         navigate('/dashboard'); // Redirect to dashboard
       } else {
         throw new Error('Association failed.');
@@ -114,22 +114,22 @@ const SelectTenantPage: React.FC = () => {
     setError(null);
     try {
        // TODO: Replace with actual API call
-      // const response = await apiClient.post('/auth/create-and-associate-tenant', { tenantName: newTenantName.trim() });
+      const response = await apiClient.post('/auth/create-and-associate-tenant', { tenantName: newTenantName.trim() });
        // Mock response:
-       const mockResponse = {
-        status: 'success',
-        data: {
-          accessToken: 'dummy-jwt-access-token-new',
-          refreshToken: 'dummy-jwt-refresh-token-new',
-          user: { ...pendingUser, roles: ['admin'] } // User is admin of new tenant
-        }
-      };
+       // const mockResponse = {
+       //  status: 'success',
+       //  data: {
+       //    accessToken: 'dummy-jwt-access-token-new',
+       //    refreshToken: 'dummy-jwt-refresh-token-new',
+       //    user: { ...pendingUser, roles: ['admin'] } // User is admin of new tenant
+       //  }
+       // };
       // --- End Mock ---
 
-      if (mockResponse.status === 'success' && mockResponse.data?.accessToken) {
+      if (response.status === 'success' && response.data?.accessToken) {
          // TODO: Store tokens and user data
-        // dispatch(setCredentials({ token: mockResponse.data.accessToken, user: mockResponse.data.user }));
-        console.log('TODO: Store credentials', mockResponse.data);
+        dispatch(setCredentials({ token: response.data.accessToken, user: response.data.user }));
+        console.log('TODO: Store credentials', response.data);
         navigate('/dashboard'); // Redirect to dashboard
       } else {
         throw new Error('Tenant creation failed.');
